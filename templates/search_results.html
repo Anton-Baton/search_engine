@@ -1,0 +1,14 @@
+{% extends "bootstrap/base.html" %}
+
+{% block title %}Search results{% endblock %}
+
+{% block content %}
+	<div class="container">
+		<p><h1>User requested [{{query}}]</h1></p>
+		<ul>
+			{% for doc in docs %}
+				<li>{{doc}}</li>
+			{% endfor %}
+		</ul>
+	</div>
+{% endblock %}

@@ -1,2 +1,5 @@
 requests
 beautifulsoup4
+flask
+flask-bootstrap
+flask-wtf

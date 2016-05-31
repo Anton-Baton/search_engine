@@ -58,8 +58,8 @@ class Crawler(object):
 def main():
 	logging.getLogger().setLevel(logging.DEBUG)
 	parser = argparse.ArgumentParser(description='Crawl /r/astronomy/')
-	parser.add_argument('--start_url',  dest='start_url')
-	parser.add_argument('--storage_dir', dest='storage_dir')
+	parser.add_argument('--start_url',  dest='start_url', required=True)
+	parser.add_argument('--storage_dir', dest='storage_dir', required=True)
 	args = parser.parse_args()
 	#print args.start_url
 	crawler = Crawler(args.start_url, args.storage_dir)

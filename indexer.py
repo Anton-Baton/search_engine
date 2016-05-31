@@ -1,3 +1,4 @@
+#!/usr/bin/search_engine python
 # Forward index
 # Inderted index
 
@@ -49,16 +50,34 @@ class Indexer(object):
 	
 
 	def save_on_disk(self, index_dir):
-		inverted_index_file_name = os.path.join(index_dir, "inverted_index")
-		forward_index_file_name = os.path.join(index_dir, "forward_index")
-		url_to_id_file_name = os.path.join(index_dir, "url_to_id")
-		with open(inverted_index_file_name, 'w') as f:
-			json.dump(self.inverted_index, f, indent=4)
-		with open(forward_index_file_name, 'w') as f:
-			json.dump(self.forward_index, f, indent=4)
-		with open(url_to_id_file_name, 'w') as f:
-			json.dump(self.url_to_id, f, indent=4)
 
+		def dump_json_to_file(source, file_name):
+			file_path = os.path.join(index_dir, file_name)
+			with open(file_path, 'w') as f:
+				json.dump(source, f, indent=4)
+		dump_json_to_file(self.inverted_index, 'inverted_index')
+		dump_json_to_file(self.forward_index, 'forward_index')
+		dump_json_to_file(self.url_to_id, 'url_to_id')
+
+
+class Searcher(object):
+	def __init__(self, index_dir):
+		def load_json_from_file(file_name):
+			file_path = os.path.join(index_dir, file_name)
+			with open(file_path, 'r') as f:
+				return json.load(f)
+		self.inverted_index = load_json_from_file('inverted_index')
+		self.forward_index = load_json_from_file('forward_index')
+		self.url_to_id = load_json_from_file('url_to_id')
+
+	# query [word1, word2] -> all documents that contains one of this words
+	def find_documents(self, words):
+		posting_list = []
+		for word in words:
+			# posting list [(pos, doc_id)]
+			# TODO: check the situations when word does not in index
+			posting_list.append(self.inverted_index[word])
+		return posting_list
 
 def create_index_from_dir(stored_documents_dir, index_dir):
 	indexer = Indexer()
@@ -73,8 +92,8 @@ def create_index_from_dir(stored_documents_dir, index_dir):
 def main():
 	#logging.getLogger().setLevel(logging.INFO)
 	parser = argparse.ArgumentParser(description='Index /r/astronomy/')
-	parser.add_argument('--stored_documents_dir',  dest='stored_documents_dir')
-	parser.add_argument('--index_dir', dest='index_dir')
+	parser.add_argument('--stored_documents_dir',  dest='stored_documents_dir', required=True)
+	parser.add_argument('--index_dir', dest='index_dir', required=True)
 	args = parser.parse_args()
 	#print args.start_url
 	indexer = create_index_from_dir(args.stored_documents_dir, args.index_dir)
