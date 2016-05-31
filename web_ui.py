@@ -25,8 +25,9 @@ def index():
 
 @app.route("/search_results/<query>")
 def search_results(query):
-	docs = searcher.find_documents(query.split())
-	return render_template('search_results.html', query=query, docs=docs)
+	pos_and_docids = searcher.find_documents(query.split())
+	urls = [searcher.get_url(id) for pos, id in pos_and_docids]
+	return render_template('search_results.html', query=query, urls=urls)
 
 if __name__ == '__main__':
 	app.run(debug=True)

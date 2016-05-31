@@ -65,19 +65,26 @@ class Searcher(object):
 		def load_json_from_file(file_name):
 			file_path = os.path.join(index_dir, file_name)
 			with open(file_path, 'r') as f:
+				# TODO: is it correct to return immediatly ?
 				return json.load(f)
 		self.inverted_index = load_json_from_file('inverted_index')
 		self.forward_index = load_json_from_file('forward_index')
 		self.url_to_id = load_json_from_file('url_to_id')
 
+		self.id_to_url = {v: k for k, v in self.url_to_id.iteritems()}
+
 	# query [word1, word2] -> all documents that contains one of this words
 	def find_documents(self, words):
 		posting_list = []
-		for word in words:
-			# posting list [(pos, doc_id)]
-			# TODO: check the situations when word does not in index
-			posting_list.append(self.inverted_index[word])
-		return posting_list
+		# for word in words:
+		# 	# posting list [(pos, doc_id)]
+		# 	# TODO: check the situations when word does not in index
+		# 	posting_list.extend(self.inverted_index[word])
+		# return posting_list
+		return sum([self.inverted_index[word] for word in words], [])
+
+	def get_url(self, id):
+		return self.id_to_url[id]
 
 def create_index_from_dir(stored_documents_dir, index_dir):
 	indexer = Indexer()
@@ -85,7 +92,7 @@ def create_index_from_dir(stored_documents_dir, index_dir):
 		with open(os.path.join(stored_documents_dir, filename), 'r') as f:
 			# TODO: word separated not just by spaces
 			parsed_doc = parse_reddit_post(f.read()).split()
-			indexer.add_document(base64.b16encode(filename), parsed_doc)
+			indexer.add_document(base64.b16decode(filename), parsed_doc)
 	return indexer
 
 
