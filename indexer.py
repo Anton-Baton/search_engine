@@ -21,7 +21,7 @@ import os
 import base64
 import argparse
 from util import parse_reddit_post
-
+from collections import defaultdict
 
 # TODO: improve
 # Indexer asumes that collection fits in RAM
@@ -72,19 +72,54 @@ class Searcher(object):
 		self.url_to_id = load_json_from_file('url_to_id')
 
 		self.id_to_url = {v: k for k, v in self.url_to_id.iteritems()}
-
+	"""
 	# query [word1, word2] -> all documents that contains one of this words
-	def find_documents(self, words):
+	# OR-LIKE
+	def find_documents(self, query_words):
 		posting_list = []
 		# for word in words:
 		# 	# posting list [(pos, doc_id)]
 		# 	# TODO: check the situations when word does not in index
 		# 	posting_list.extend(self.inverted_index[word])
 		# return posting_list
-		return sum([self.inverted_index[word] for word in words], [])
+		return sum([self.inverted_index[word] for word in query_words], [])
+	"""
+	# AND-LIKE - if all words in doc
+	def find_documents_AND(self, query_words):
+		query_words_count = defaultdict(set)
+		for word in query_words:
+			for pos, doc_id in self.inverted_index[word]:
+				query_words_count[doc_id].add(word)
+		return [doc_id for doc_id, unique_hits in query_words_count.iteritems() 
+				if len(unique_hits) == len(query_words)]
 
-	def get_url(self, id):
-		return self.id_to_url[id]
+	def generate_snippet(self, query_words, doc_id): 
+		query_words_in_window = []
+		best_window_len = 10**8
+		best_window = []
+		# TODO: fix doc_id is string
+		for pos, word in enumerate(self.forward_index[str(doc_id)]):
+			if word in query_words:
+				query_words_in_window.append((word, pos))
+
+				if len(query_words_in_window) > 1 and query_words_in_window[0][0] == word:
+					query_words_in_window.pop(0)
+				current_window_len = pos - query_words_in_window[0][1] + 1
+				if len(set(query_words_in_window)) == len(query_words) and \
+					current_window_len < best_window_len:
+					best_window = query_words_in_window[:]
+					best_window_len = current_window_len
+		# TODO: fix doc_id
+		return self.forward_index[str(doc_id)][best_window[0][1]:best_window[-1][1]+1]
+
+
+
+	def get_document_text(self, doc_id):
+		# TODO: fix str - something strange
+		return self.forward_index[str(doc_id)]
+
+	def get_url(self, doc_id):
+		return self.id_to_url[doc_id]
 
 def create_index_from_dir(stored_documents_dir, index_dir):
 	indexer = Indexer()
