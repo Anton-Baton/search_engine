@@ -22,6 +22,7 @@ import base64
 import argparse
 from util import parse_reddit_post
 from collections import defaultdict
+from lang_proc import doc_terms
 
 # TODO: improve
 # Indexer asumes that collection fits in RAM
@@ -78,20 +79,18 @@ class Searcher(object):
 	def find_documents_OR(self, query_words):
 		docids = set()
 		for query_word in query_words:
-		 	# posting list [(pos, doc_id)]
-		 	# TODO: check the situations when word does not in index
-		 	#posting_list.extend(self.inverted_index[word])
-		 	for (pos, doc_id) in self.inverted_index[query_word]:
-		 		docids.add(doc_id)
+		 	if query_word in self.inverted_index:
+			 	for (pos, doc_id) in self.inverted_index[query_word]:
+			 		docids.add(doc_id)
 		return docids
-		#return sum([self.inverted_index[word] for word in query_words], [])
 	
 	# AND-LIKE - if all words in doc
 	def find_documents_AND(self, query_words):
 		query_words_count = defaultdict(set)
 		for word in query_words:
-			for pos, doc_id in self.inverted_index[word]:
-				query_words_count[doc_id].add(word)
+			if word in self.inverted_index:
+				for pos, doc_id in self.inverted_index[word]:
+					query_words_count[doc_id].add(word)
 		return [doc_id for doc_id, unique_hits in query_words_count.iteritems() 
 				if len(unique_hits) == len(query_words)]
 
@@ -133,7 +132,9 @@ def create_index_from_dir(stored_documents_dir, index_dir):
 	for filename in os.listdir(stored_documents_dir):
 		with open(os.path.join(stored_documents_dir, filename), 'r') as f:
 			# TODO: word separated not just by spaces
-			parsed_doc = parse_reddit_post(f.read()).split()
+			#parsed_doc = parse_reddit_post(f.read()).split()
+			doc_raw = parse_reddit_post(f.read())
+			parsed_doc = doc_terms(doc_raw)
 			indexer.add_document(base64.b16decode(filename), parsed_doc)
 	return indexer
 
