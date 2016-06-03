@@ -69,7 +69,8 @@ class Searcher(object):
 				# TODO: is it correct to return immediatly ?
 				return json.load(f)
 		self.inverted_index = load_json_from_file('inverted_index')
-		self.forward_index = load_json_from_file('forward_index')
+		# need to do this, cause keys in JSON are always strings - but we need ints
+		self.forward_index = dict(map(lambda x: (int(x[0]), x[1]),load_json_from_file('forward_index').items()))
 		self.url_to_id = load_json_from_file('url_to_id')
 
 		self.id_to_url = {v: k for k, v in self.url_to_id.iteritems()}
@@ -99,8 +100,7 @@ class Searcher(object):
 		best_window_len = 10**8
 		best_window = []
 		words_in_best_window = 0
-		# TODO: fix doc_id is string
-		for pos, word in enumerate(self.forward_index[str(doc_id)]):
+		for pos, word in enumerate(self.forward_index[doc_id]):
 			if word in query_words:
 				query_words_in_window.append((word, pos))
 
@@ -113,16 +113,15 @@ class Searcher(object):
 					best_window = query_words_in_window[:]
 					best_window_len = current_window_len
 					words_in_best_window = wiw
-		doc_len = len(self.forward_index[str(doc_id)])
+		doc_len = len(self.forward_index[doc_id])
 		# TODO: move 15 to named constants
 		snippet_start = max(best_window[0][1] - 15, 0)
 		snippet_end = min(doc_len, best_window[-1][1] + 1 +15)
-		return [(word, word in query_words) for word in self.forward_index[str(doc_id)][snippet_start: snippet_end]]
+		return [(word, word in query_words) for word in self.forward_index[doc_id][snippet_start: snippet_end]]
 
 
 	def get_document_text(self, doc_id):
-		# TODO: fix str - something strange
-		return self.forward_index[str(doc_id)]
+		return self.forward_index[doc_id]
 
 	def get_url(self, doc_id):
 		return self.id_to_url[doc_id]
@@ -131,8 +130,6 @@ def create_index_from_dir(stored_documents_dir, index_dir):
 	indexer = Indexer()
 	for filename in os.listdir(stored_documents_dir):
 		with open(os.path.join(stored_documents_dir, filename), 'r') as f:
-			# TODO: word separated not just by spaces
-			#parsed_doc = parse_reddit_post(f.read()).split()
 			doc_raw = parse_reddit_post(f.read())
 			parsed_doc = doc_terms(doc_raw)
 			indexer.add_document(base64.b16decode(filename), parsed_doc)
