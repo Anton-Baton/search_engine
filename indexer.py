@@ -72,18 +72,20 @@ class Searcher(object):
 		self.url_to_id = load_json_from_file('url_to_id')
 
 		self.id_to_url = {v: k for k, v in self.url_to_id.iteritems()}
-	"""
+	
 	# query [word1, word2] -> all documents that contains one of this words
 	# OR-LIKE
-	def find_documents(self, query_words):
-		posting_list = []
-		# for word in words:
-		# 	# posting list [(pos, doc_id)]
-		# 	# TODO: check the situations when word does not in index
-		# 	posting_list.extend(self.inverted_index[word])
-		# return posting_list
-		return sum([self.inverted_index[word] for word in query_words], [])
-	"""
+	def find_documents_OR(self, query_words):
+		docids = set()
+		for query_word in query_words:
+		 	# posting list [(pos, doc_id)]
+		 	# TODO: check the situations when word does not in index
+		 	#posting_list.extend(self.inverted_index[word])
+		 	for (pos, doc_id) in self.inverted_index[query_word]:
+		 		docids.add(doc_id)
+		return docids
+		#return sum([self.inverted_index[word] for word in query_words], [])
+	
 	# AND-LIKE - if all words in doc
 	def find_documents_AND(self, query_words):
 		query_words_count = defaultdict(set)
@@ -97,6 +99,7 @@ class Searcher(object):
 		query_words_in_window = []
 		best_window_len = 10**8
 		best_window = []
+		words_in_best_window = 0
 		# TODO: fix doc_id is string
 		for pos, word in enumerate(self.forward_index[str(doc_id)]):
 			if word in query_words:
@@ -105,13 +108,17 @@ class Searcher(object):
 				if len(query_words_in_window) > 1 and query_words_in_window[0][0] == word:
 					query_words_in_window.pop(0)
 				current_window_len = pos - query_words_in_window[0][1] + 1
-				if len(set(query_words_in_window)) == len(query_words) and \
-					current_window_len < best_window_len:
+				wiw = len(set(map(lambda x: x[0], query_words_in_window)))
+				if wiw > words_in_best_window or (wiw == words_in_best_window 
+					and current_window_len < best_window_len):
 					best_window = query_words_in_window[:]
 					best_window_len = current_window_len
-		# TODO: fix doc_id
-		return self.forward_index[str(doc_id)][best_window[0][1]:best_window[-1][1]+1]
-
+					words_in_best_window = wiw
+		doc_len = len(self.forward_index[str(doc_id)])
+		# TODO: move 15 to named constants
+		snippet_start = max(best_window[0][1] - 15, 0)
+		snippet_end = min(doc_len, best_window[-1][1] + 1 +15)
+		return [(word, word in query_words) for word in self.forward_index[str(doc_id)][snippet_start: snippet_end]]
 
 
 	def get_document_text(self, doc_id):

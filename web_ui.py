@@ -26,9 +26,9 @@ def index():
 @app.route("/search_results/<query>")
 def search_results(query):
 	query_words = query.lower().split()
-	docids = searcher.find_documents_AND(query_words)
+	docids = searcher.find_documents_OR(query_words)
 	urls = [searcher.get_url(doc_id) for doc_id in docids]
-	texts = [' '.join(searcher.generate_snippet(query_words, doc_id)) for doc_id in docids]
+	texts = [searcher.generate_snippet(query_words, doc_id) for doc_id in docids]
 	return render_template('search_results.html', query=query, urls_and_texts=zip(urls, texts))
 
 if __name__ == '__main__':

@@ -14,9 +14,19 @@
 						<a href="{{url}}">{{url}}</a>
 					</p>
 					<p>
-						{{text}}
+						...
+						{% for word, bold in text %}
+							{% if bold %} <b> {% endif %}
+								{{word}}
+							{% if bold %} </b> {% endif %}	
+						{% endfor %}
+						...
 					</p>
 				</li>
+				{% else %}
+					<p>
+						No results found
+				 	</p>
 			{% endfor %}
 		</ol>
 	</div>
