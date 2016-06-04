@@ -4,18 +4,35 @@ from nltk.tokenize import sent_tokenize, TreebankWordTokenizer
 import itertools
 import string
 
+
+class Term(object):
+	def __init__(self, full_word):
+		self.full_word = full_word
+		self.stem = PorterStemmer().stem(full_word).lower()
+
+	def __eq__(self, other):
+		return self.stem == other.stem
+
+	def __hash__(self):
+		return hash(self.stem)
+
+	def is_punctuation(self):
+		return self.stem in string.punctuation
+
+
 def stem_and_tokenize_text(text):
 	sents = sent_tokenize(text)
 	tokens = list(itertools.chain(*[TreebankWordTokenizer().tokenize(sent) 
 		for sent in sents]))
-	stems = [PorterStemmer().stem(token) for token in tokens]
-	terms = [stem.lower() for stem in stems if stem not in string.punctuation]
-	return terms
+	terms = [Term(token) for token in tokens]
+	return [term for term in terms if not term.is_punctuation()]
  
-def query_terms(query_raw):
+
+def to_query_terms(query_raw):
 	# In case query needs some processing
 	return stem_and_tokenize_text(query_raw)
 
-def doc_terms(doc_raw):
+
+def to_doc_terms(doc_raw):
 	# In case doc needs some processing
 	return stem_and_tokenize_text(doc_raw)

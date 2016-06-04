@@ -19,6 +19,7 @@ class Crawler(object):
 
 	def crawl(self):
 		current_page_url = self.start_url
+		logging.getLogger('requests').setLevel(logging.WARNING)
 		logging.debug('Starting to crawl page {}'.format(self.start_url))
 
 		#headers = {'User-Agent': 'SearchingBot 0.1'}	
