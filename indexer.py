@@ -24,6 +24,7 @@ import argparse
 from util import parse_reddit_post
 from collections import defaultdict
 from lang_proc import to_doc_terms
+import time
 
 
 class BaseIndeces(object):
@@ -112,9 +113,11 @@ class ShelveIndeces(BaseIndeces):
 		self.doc_count = 0
 
 	def start_indexing(self, index_dir):
-		self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'), 'c')
-		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'), 'c')
-		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'), 'c')
+		# 'c' - for append
+		# 'n' - for rewrite
+		self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'), 'n')
+		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'), 'n')
+		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'), 'n')
 
 	def add_document(self, url, parsed_text):
 		self.doc_count += 1
@@ -130,7 +133,7 @@ class ShelveIndeces(BaseIndeces):
 
 		for pos, term in enumerate(parsed_text):
 			stem = term.stem.encode('utf-8')
-			posts = self.inverted_index[stem] if stem in self.inverted_index else []
+			posts = self.inverted_index.get(stem, []) # if stem in self.inverted_index else []
 			posts.append((pos, current_id))
 			self.inverted_index[stem] = posts
 
@@ -175,6 +178,7 @@ class Searcher(object):
 		best_window = []
 		terms_in_best_window = 0
 		document = self.indeces.get_document_text(doc_id)
+		start_time = time.time()
 		for pos, term in enumerate(document):
 			if term in query_terms:
 				query_terms_in_window.append((term, pos))
@@ -188,6 +192,7 @@ class Searcher(object):
 					best_window = query_terms_in_window[:]
 					best_window_len = current_window_len
 					terms_in_best_window = tiw
+		#print 'Snippet time: ', time.time() - start_time
 		doc_len = len(document)
 		# TODO: move 15 to named constants
 		snippet_start = max(best_window[0][1] - 15, 0)

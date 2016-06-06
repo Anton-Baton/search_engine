@@ -5,6 +5,7 @@ from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired
 from indexer import Searcher, InMemoryIndeces, ShelveIndeces
 from lang_proc import to_query_terms
+import time
 
 app = Flask(__name__)
 Bootstrap(app)
@@ -31,9 +32,13 @@ def index():
 @app.route("/search_results/<query>")
 def search_results(query):
 	query_terms = to_query_terms(query)
+	start_time = time.time()
 	docids = searcher.find_documents_OR(query_terms)
+	print 'Search time: ', time.time() - start_time
 	urls = [searcher.get_url(doc_id) for doc_id in docids]
+	start_time = time.time()
 	texts = [searcher.generate_snippet(query_terms, doc_id) for doc_id in docids]
+	print 'Snippets time: ', time.time() - start_time
 	return render_template('search_results.html', query=query, urls_and_texts=zip(urls, texts))
 
 if __name__ == '__main__':
