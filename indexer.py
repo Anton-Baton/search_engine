@@ -137,7 +137,7 @@ class ShelveIndeces(BaseIndeces):
 			posts.append((pos, current_id))
 			self.inverted_index[stem] = posts
 
-	def get_documents(self, query_term):
+	def get_documents(self, query_term): 
 		return self.inverted_index.get(query_term.stem.encode('utf-8'), [])
 
 	def get_document_text(self, doc_id):
@@ -147,30 +147,40 @@ class ShelveIndeces(BaseIndeces):
 		return self.id_to_url[doc_id]
 
 
+class SearchResults:
+	def __init__(self, docids):
+		self.docids = docids
+
+	def get_page(self, page, page_size):
+		offset = (page-1)*page_size
+		return self.docids[offset: offset+page_size]
+
+	def total_pages(self, page_size):
+		return (len(self.docids) / page_size) + 1
+
 
 class Searcher(object):
 	def __init__(self, index_dir, IndecesImplementation):
 		self.indeces = IndecesImplementation()
 		self.indeces.load_from_disk(index_dir)
 
-		
 	# query [word1, word2] -> all documents that contains one of this words
 	# OR-LIKE
-	def find_documents_OR(self, query_terms):
+	def find_documents_OR(self, query_terms, offset=None, limit=None):
 		docids = set()
 		for query_term in query_terms:
 		 	for (pos, doc_id) in self.indeces.get_documents(query_term):
 		 		docids.add(doc_id)
-		return docids
+		return SearchResults(list(docids))
 	
 	# AND-LIKE - if all words in doc
-	def find_documents_AND(self, query_terms):
+	def find_documents_AND(self, query_terms, offset=None, limit=None):
 		query_terms_count = defaultdict(set)
 		for query_term in query_terms:
 			for pos, doc_id in self.indeces.get_documents(query_term):
 				query_terms_count[doc_id].add(query_term)
-		return [doc_id for doc_id, unique_hits in query_terms_count.iteritems() 
-				if len(unique_hits) == len(query_terms)]
+		return SearchResults([doc_id for doc_id, unique_hits in query_terms_count.iteritems() 
+				if len(unique_hits) == len(query_terms)])
 
 	def generate_snippet(self, query_terms, doc_id): 
 		query_terms_in_window = []
