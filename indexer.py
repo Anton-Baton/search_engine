@@ -17,6 +17,7 @@
 # python: [doc1, doc3]
 
 import pickle
+import shelve
 import os
 import base64
 import argparse
@@ -25,9 +26,7 @@ from collections import defaultdict
 from lang_proc import to_doc_terms
 
 
-# TODO: improve
-# InMemoryIndeces asumes that collection fits in RAM
-class InMemoryIndeces(object):
+class BaseIndeces(object):
 	def __init__(self):
 		self.inverted_index = defaultdict(list)
 		self.forward_index = dict()
@@ -35,19 +34,40 @@ class InMemoryIndeces(object):
 		self.id_to_url = dict()
 		self.doc_count = 0
 
+	def start_indexing(self, index_dir):
+		pass
+
 	# TODO: remove assumptions
 	# assume that add_document() never called twice for one doc
 	# assumes that a document has an unique url
 	# parsed text is list of Terms
 	def add_document(self, url, parsed_text):
 		self.doc_count += 1
-		assert url not in self.url_to_id
+		#assert url not in self.url_to_id
+		if url in self.url_to_id:
+			print url
+			return
 		current_id = self.doc_count
 		self.url_to_id[url] = current_id
 		self.id_to_url[current_id] = url
-		self.forward_index[current_id] = parsed_text
+		self.forward_index[str(current_id)] = parsed_text
 		for position, term in enumerate(parsed_text):
 			self.inverted_index[term].append((position, current_id))
+
+	def get_document_text(self, doc_id):
+		return self.forward_index[str(doc_id)]
+
+	def get_url(self, doc_id):
+		return self.id_to_url[doc_id]
+
+	def get_documents(self, query_term):
+		return self.inverted_index[query_term] 
+
+
+
+# TODO: improve
+# InMemoryIndeces asumes that collection fits in RAM
+class InMemoryIndeces(BaseIndeces):	
 
 	def save_on_disk(self, index_dir):
 		def dump_pickle_to_file(source, file_name):
@@ -71,20 +91,65 @@ class InMemoryIndeces(object):
 
 		self.id_to_url = {v: k for k, v in self.url_to_id.iteritems()}
 
+
+class ShelveIndeces(BaseIndeces):
+	def __init__(self):
+		super(ShelveIndeces, self).__init__()
+		self.inverted_index = None
+		self.forward_index = None
+		self.url_to_id = None
+
+	def save_on_disk(self, index_dir):
+		self.inverted_index.close()
+		self.forward_index.close()
+		self.url_to_id.close()
+
+	def load_from_disk(self, index_dir):
+		self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'))
+		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'))
+		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'))
+		self.id_to_url = {v:k for k, v in self.url_to_id.iteritems()}
+		self.doc_count = 0
+
+	def start_indexing(self, index_dir):
+		self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'), 'c')
+		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'), 'c')
+		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'), 'c')
+
+	def add_document(self, url, parsed_text):
+		self.doc_count += 1
+
+		if url in self.url_to_id:
+			print url
+			return
+
+		current_id = self.doc_count
+		self.url_to_id[url] = current_id
+		self.id_to_url[str(current_id)] = url
+		self.forward_index[str(current_id)] = parsed_text
+
+		for pos, term in enumerate(parsed_text):
+			stem = term.stem.encode('utf-8')
+			posts = self.inverted_index[stem] if stem in self.inverted_index else []
+			posts.append((pos, current_id))
+			self.inverted_index[stem] = posts
+
+	def get_documents(self, query_term):
+		return self.inverted_index.get(query_term.stem.encode('utf-8'), [])
+
 	def get_document_text(self, doc_id):
-		return self.forward_index[doc_id]
+		return self.forward_index[str(doc_id)]
 
 	def get_url(self, doc_id):
 		return self.id_to_url[doc_id]
 
-	def get_documents(self, query_term):
-		return self.inverted_index[query_term]
 
 
 class Searcher(object):
-	def __init__(self, index_dir):
-		self.indeces = InMemoryIndeces()
+	def __init__(self, index_dir, IndecesImplementation):
+		self.indeces = IndecesImplementation()
 		self.indeces.load_from_disk(index_dir)
+
 		
 	# query [word1, word2] -> all documents that contains one of this words
 	# OR-LIKE
@@ -133,8 +198,11 @@ class Searcher(object):
 		return self.indeces.get_url(doc_id)
 
 
-def create_index_from_dir(stored_documents_dir, index_dir):
-	indexer = InMemoryIndeces()
+def create_index_from_dir(stored_documents_dir, index_dir,
+	IndecesImplementation=ShelveIndeces):
+
+	indexer = IndecesImplementation()
+	indexer.start_indexing(index_dir)
 	for filename in os.listdir(stored_documents_dir):
 		with open(os.path.join(stored_documents_dir, filename), 'r') as f:
 			doc_raw = parse_reddit_post(f.read())

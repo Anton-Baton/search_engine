@@ -1,16 +1,20 @@
-from flask import Flask, render_template, url_for, redirect
+from flask import Flask, render_template, url_for, redirect, g
 from flask_bootstrap import Bootstrap
 from flask_wtf import Form
 from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired
-from indexer import Searcher
+from indexer import Searcher, InMemoryIndeces, ShelveIndeces
 from lang_proc import to_query_terms
 
 app = Flask(__name__)
 Bootstrap(app)
 # TODO: configurable
-searcher = Searcher('indeces')
+searcher = Searcher('shelve_indeces', ShelveIndeces)
 
+
+#@app.before_first_request
+#def init_searcher():
+#	g.searcher = Searcher('indeces')
 
 class SearchForm(Form):
 	user_query = StringField('user_query', validators=[DataRequired()])
