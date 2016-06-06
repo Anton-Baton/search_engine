@@ -14,5 +14,8 @@ def download_reddit_url(url):
 
 def parse_reddit_post(html):
 	soup = BeautifulSoup(html)
-	post = soup.select('div.usertext-body')[1].text
+	post = ' '.join(map(lambda x: x.text, 
+		soup.select('div.content div.usertext-body')))
+	#post = soup.select('div.usertext-body')[0].text + ' ' + ' '.join(map(lambda x: x.text, 
+	#	soup.select('div.commentarea div.usertext-body')))
 	return post
