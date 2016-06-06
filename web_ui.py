@@ -6,6 +6,7 @@ from wtforms.validators import DataRequired
 from indexer import Searcher, InMemoryIndeces, ShelveIndeces
 from lang_proc import to_query_terms
 import time
+import cgi
 
 app = Flask(__name__)
 Bootstrap(app)
@@ -46,7 +47,7 @@ def search_results(query, page):
 	print 'Snippets time: ', time.time() - start_time
 	return render_template('search_results.html',
 		page=page, offset=offset+1, total_pages_num=search_results.total_pages(page_size),
-		query=query, urls_and_texts=zip(urls, texts))
+		query=cgi.escape(query), urls_and_texts=zip(urls, texts))
 
 if __name__ == '__main__':
 	app.run(debug=True)
