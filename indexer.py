@@ -25,6 +25,7 @@ from util import parse_reddit_post
 from collections import defaultdict
 from lang_proc import to_doc_terms
 import time
+import math
 from progressbar import ProgressBar, Bar
 
 
@@ -32,6 +33,15 @@ class Document(object):
 	def __init__(self, parsed_text, score):
 		self.parsed_text = parsed_text
 		self.score = score
+
+	def __getitem__(self, i):
+		return self.parsed_text[i]
+
+	def __iter__(self):
+		return self.parsed_text.__iter__()
+
+	def __len__(self):
+		return len(self.parsed_text)
 
 
 class ShelveIndeces(object):
@@ -88,17 +98,20 @@ class ShelveIndeces(object):
 	def get_url(self, doc_id):
 		return self.id_to_url[doc_id]
 
+	def get_document_score(self, doc_id):
+		return self.forward_index[str(doc_id)].score
 
-class SearchResults:
-	def __init__(self, docids):
-		self.docids = docids
+
+class SearchResults(object):
+	def __init__(self, docids_with_relevance):
+		self.docids, self.relevance = zip(*docids_with_relevance)
 
 	def get_page(self, page, page_size):
 		offset = (page-1)*page_size
 		return self.docids[offset: offset+page_size]
 
 	def total_pages(self, page_size):
-		return (len(self.docids) / page_size) + 1
+		return int(math.ceil(len(self.docids)*1.0/page_size))
 
 	def total_docs(self):
 		return len(self.docids)
@@ -116,16 +129,19 @@ class Searcher(object):
 		for query_term in query_terms:
 		 	for (pos, doc_id) in self.indeces.get_documents(query_term):
 		 		docids.add(doc_id)
-		return SearchResults(list(docids))
+		return SearchResults(self.rank_docids(docids))
 	
+	def rank_docids(self, docids):
+		return sorted([(doc_id, self.indeces.get_document_score(doc_id)) for doc_id in docids], key=lambda x: x[1])
+
 	# AND-LIKE - if all words in doc
 	def find_documents_AND(self, query_terms, offset=None, limit=None):
 		query_terms_count = defaultdict(set)
 		for query_term in query_terms:
 			for pos, doc_id in self.indeces.get_documents(query_term):
 				query_terms_count[doc_id].add(query_term)
-		return SearchResults([doc_id for doc_id, unique_hits in query_terms_count.iteritems() 
-				if len(unique_hits) == len(query_terms)])
+		return SearchResults(self.rank_docids([doc_id for doc_id, unique_hits in query_terms_count.iteritems() 
+				if len(unique_hits) == len(query_terms)]))
 
 	def generate_snippet(self, query_terms, doc_id): 
 		query_terms_in_window = []
@@ -171,7 +187,7 @@ def create_index_from_dir(stored_documents_dir, index_dir,
 			parsed_doc = to_doc_terms(doc_raw)
 			indexer.add_document(base64.b16decode(filename), Document(parsed_doc, doc_score))
 			total_docs_indexed += 1
-			if total_docs_indexed % 100 = 0:
+			if total_docs_indexed % 100 == 0:
 				print 'Indexed: ', total_docs_indexed
 	return indexer
 
