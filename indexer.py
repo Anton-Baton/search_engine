@@ -158,6 +158,9 @@ class SearchResults:
 	def total_pages(self, page_size):
 		return (len(self.docids) / page_size) + 1
 
+	def total_docs(self):
+		return len(self.docids)
+
 
 class Searcher(object):
 	def __init__(self, index_dir, IndecesImplementation):
