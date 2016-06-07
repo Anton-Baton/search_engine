@@ -25,80 +25,22 @@ from util import parse_reddit_post
 from collections import defaultdict
 from lang_proc import to_doc_terms
 import time
+from progressbar import ProgressBar, Bar
 
 
-class BaseIndeces(object):
+class Document(object):
+	def __init__(self, parsed_text, score):
+		self.parsed_text = parsed_text
+		self.score = score
+
+
+class ShelveIndeces(object):
 	def __init__(self):
-		self.inverted_index = defaultdict(list)
-		self.forward_index = dict()
-		self.url_to_id = dict()
-		self.id_to_url = dict()
-		self.doc_count = 0
-
-	def start_indexing(self, index_dir):
-		pass
-
-	# TODO: remove assumptions
-	# assume that add_document() never called twice for one doc
-	# assumes that a document has an unique url
-	# parsed text is list of Terms
-	def add_document(self, url, parsed_text):
-		self.doc_count += 1
-		#assert url not in self.url_to_id
-		if url in self.url_to_id:
-			print url
-			return
-		current_id = self.doc_count
-		self.url_to_id[url] = current_id
-		self.id_to_url[current_id] = url
-		self.forward_index[str(current_id)] = parsed_text
-		for position, term in enumerate(parsed_text):
-			self.inverted_index[term].append((position, current_id))
-
-	def get_document_text(self, doc_id):
-		return self.forward_index[str(doc_id)]
-
-	def get_url(self, doc_id):
-		return self.id_to_url[doc_id]
-
-	def get_documents(self, query_term):
-		return self.inverted_index[query_term] 
-
-
-
-# TODO: improve
-# InMemoryIndeces asumes that collection fits in RAM
-class InMemoryIndeces(BaseIndeces):	
-
-	def save_on_disk(self, index_dir):
-		def dump_pickle_to_file(source, file_name):
-			file_path = os.path.join(index_dir, file_name)
-			with open(file_path, 'w') as f:
-				pickle.dump(source, f)
-		dump_pickle_to_file(self.inverted_index, 'inverted_index')
-		dump_pickle_to_file(self.forward_index, 'forward_index')
-		dump_pickle_to_file(self.url_to_id, 'url_to_id')
-
-	def load_from_disk(self, index_dir):
-		def load_pickle_from_file(file_name):
-			file_path = os.path.join(index_dir, file_name)
-			with open(file_path, 'r') as f:
-				# TODO: is it correct to return immediatly ?
-				return pickle.load(f)
-		self.inverted_index = load_pickle_from_file('inverted_index')
-		# need to do this, cause keys in pickle are always strings - but we need ints
-		self.forward_index = load_pickle_from_file('forward_index')
-		self.url_to_id = load_pickle_from_file('url_to_id')
-
-		self.id_to_url = {v: k for k, v in self.url_to_id.iteritems()}
-
-
-class ShelveIndeces(BaseIndeces):
-	def __init__(self):
-		super(ShelveIndeces, self).__init__()
 		self.inverted_index = None
 		self.forward_index = None
 		self.url_to_id = None
+		self.id_to_url = dict()
+		self.doc_count = 0
 
 	def save_on_disk(self, index_dir):
 		self.inverted_index.close()
@@ -119,7 +61,7 @@ class ShelveIndeces(BaseIndeces):
 		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'), 'n')
 		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'), 'n')
 
-	def add_document(self, url, parsed_text):
+	def add_document(self, url, document):
 		self.doc_count += 1
 
 		if url in self.url_to_id:
@@ -129,11 +71,11 @@ class ShelveIndeces(BaseIndeces):
 		current_id = self.doc_count
 		self.url_to_id[url] = current_id
 		self.id_to_url[str(current_id)] = url
-		self.forward_index[str(current_id)] = parsed_text
+		self.forward_index[str(current_id)] = document
 
-		for pos, term in enumerate(parsed_text):
+		for pos, term in enumerate(document.parsed_text):
 			stem = term.stem.encode('utf-8')
-			posts = self.inverted_index.get(stem, []) # if stem in self.inverted_index else []
+			posts = self.inverted_index.get(stem, []) 
 			posts.append((pos, current_id))
 			self.inverted_index[stem] = posts
 
@@ -141,7 +83,7 @@ class ShelveIndeces(BaseIndeces):
 		return self.inverted_index.get(query_term.stem.encode('utf-8'), [])
 
 	def get_document_text(self, doc_id):
-		return self.forward_index[str(doc_id)]
+		return self.forward_index[str(doc_id)].parsed_text
 
 	def get_url(self, doc_id):
 		return self.id_to_url[doc_id]
@@ -221,11 +163,16 @@ def create_index_from_dir(stored_documents_dir, index_dir,
 
 	indexer = IndecesImplementation()
 	indexer.start_indexing(index_dir)
+	total_docs_indexed = 0
+	total_docs = len(os.listdir(stored_documents_dir))
 	for filename in os.listdir(stored_documents_dir):
 		with open(os.path.join(stored_documents_dir, filename), 'r') as f:
-			doc_raw = parse_reddit_post(f.read())
+			doc_raw, doc_score = parse_reddit_post(f.read())
 			parsed_doc = to_doc_terms(doc_raw)
-			indexer.add_document(base64.b16decode(filename), parsed_doc)
+			indexer.add_document(base64.b16decode(filename), Document(parsed_doc, doc_score))
+			total_docs_indexed += 1
+			if total_docs_indexed % 100 = 0:
+				print 'Indexed: ', total_docs_indexed
 	return indexer
 
 
