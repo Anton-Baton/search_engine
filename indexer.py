@@ -26,7 +26,6 @@ from collections import defaultdict
 from lang_proc import to_doc_terms
 import time
 import math
-from progressbar import ProgressBar, Bar
 
 
 class Document(object):

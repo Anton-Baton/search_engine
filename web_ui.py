@@ -7,6 +7,7 @@ from indexer import Searcher, ShelveIndeces, Document
 from lang_proc import to_query_terms
 import time
 import cgi
+from app import app
 
 app = Flask(__name__)
 Bootstrap(app)
@@ -53,5 +54,5 @@ def search_results(query, page):
 		query=cgi.escape(query), total_docs_num=search_results.total_docs(),
 		processing_time = search_time+snippets_time, urls_and_texts=zip(urls, texts))
 
-if __name__ == '__main__':
-	app.run(debug=True, host='0.0.0.0')
+if __name__ == '__main__'
+	app.run(debug=True)
