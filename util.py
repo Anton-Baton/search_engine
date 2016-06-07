@@ -16,7 +16,7 @@ def parse_reddit_post(html):
 	soup = BeautifulSoup(html)
 	post = ' '.join(map(lambda x: x.text, 
 		soup.select('div.content div.usertext-body')))
-	score = soup.select('div.content div.score.unvoted')[0].text
+	score = int(soup.select('div.content div.score.unvoted')[0].text)
 	#post = soup.select('div.usertext-body')[0].text + ' ' + ' '.join(map(lambda x: x.text, 
 	#	soup.select('div.commentarea div.usertext-body')))
 	return post, score

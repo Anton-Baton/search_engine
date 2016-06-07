@@ -132,7 +132,8 @@ class Searcher(object):
 		return SearchResults(self.rank_docids(docids))
 	
 	def rank_docids(self, docids):
-		return sorted([(doc_id, self.indeces.get_document_score(doc_id)) for doc_id in docids], key=lambda x: x[1])
+		return sorted([(doc_id, self.indeces.get_document_score(doc_id)) for doc_id in docids],
+			key=lambda x: x[1], reverse=True)
 
 	# AND-LIKE - if all words in doc
 	def find_documents_AND(self, query_terms, offset=None, limit=None):
