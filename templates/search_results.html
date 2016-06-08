@@ -4,7 +4,7 @@
 
 {% block content %}
 	<div class="container">
-		<p><h1>User requested [{{query}}]</h1></p>
+		<p><h1>User requested [{{query | safe}}]</h1></p>
 		<p> <h3>Found {{total_docs_num}} results in {{"{:.03}".format(processing_time)}} seconds</h3>
 		<ol start='{{offset}}' >
 			{% for url_and_text in urls_and_texts %}
