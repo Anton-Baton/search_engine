@@ -108,7 +108,7 @@ class SearchResults(object):
 		return self.docids[offset: offset+page_size]
 
 	def total_pages(self, page_size):
-		return int(math.ceil(len(self.docids)*1.0/page_size))
+		return int((len(self.docids)+page_size)*1.0/page_size)
 
 	def total_docs(self):
 		return len(self.docids)
