@@ -18,7 +18,7 @@ Bootstrap(app)
 
 @app.before_request
 def init_searcher():
-	g.searcher = Searcher('shelve_indeces', ShelveIndeces)
+	g.searcher = Searcher('wiki_indices', ShelveIndeces)
 
 class SearchForm(Form):
 	user_query = StringField('user_query', validators=[DataRequired()])

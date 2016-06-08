@@ -27,6 +27,7 @@ from lang_proc import to_doc_terms
 import time
 import math
 import workaround
+import logging
 
 
 class ShelveIndeces(object):
@@ -36,11 +37,13 @@ class ShelveIndeces(object):
 		self.url_to_id = None
 		self.id_to_url = dict()
 		self.doc_count = 0
+		self.block_count = 0
 
 	def save_on_disk(self, index_dir):
 		self.inverted_index.close()
 		self.forward_index.close()
 		self.url_to_id.close()
+		self._merge_blocks()
 
 	def load_from_disk(self, index_dir):
 		self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'), writeback=True)
@@ -52,20 +55,45 @@ class ShelveIndeces(object):
 	def start_indexing(self, index_dir):
 		# 'c' - for append
 		# 'n' - for rewrite
-		self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'), 'n', writeback=True)
+		# self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'), 'n', writeback=True)
 		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'), 'n', writeback=True)
 		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'), 'n', writeback=True)
+		self.index_dir = index_dir
 
 	def sync(self):
 		self.inverted_index.sync()
 		self.forward_index.sync()
 		self.url_to_id.sync()
 
+	def _merge_blocks(self):
+		logging.debug('Start merging blocks')
+		blocks = [shelve.open(os.path.join(self.index_dir, 'inverted_index_block{}'.format(i))) for i in xrange(self.block_count+1)]
+		keys = set(sum([block.keys() for block in blocks], []))
+		logging.debug('Total keys: {}'.format(len(keys)))
+		merged_index = shelve.open(os.path.join(self.index_dir, 'inverted_index'), 'n', writeback=True)
+		for key in keys:
+			merged_index[key] = sum([block.get(key, []) for block in blocks], [])
+		merged_index.close()
+		#self.inverted_index = merged_index
+
+	def _create_new_ii_block(self):
+		logging.debug('New ii block: {}'.format(self.block_count))
+		if self.inverted_index:
+			self.inverted_index.close() 
+		self.inverted_index = shelve.open(
+				os.path.join(self.index_dir, 'inverted_index_block{}'.format(
+					self.block_count)),	'n', writeback=True)
+		logging.debug('Block created!')
+		self.block_count += 1
+		
 	def add_document(self, url, document):
+		if self.doc_count % 100 == 0:
+			self._create_new_ii_block()
+
 		self.doc_count += 1
 
 		if url in self.url_to_id:
-			print url
+			logging.debug('URL already indexed: {}'.format(url))
 			return
 
 		current_id = self.doc_count
@@ -77,9 +105,6 @@ class ShelveIndeces(object):
 			stem = term.stem.encode('utf-8') 
 			if stem not in self.inverted_index:
 				self.inverted_index[stem] = []
-			# posts = self.inverted_index.get(stem, [])  # slow
-			# posts.append((pos, current_id))
-			# self.inverted_index[stem] = posts  # slow
 			self.inverted_index[stem].append((pos, current_id))
 
 	def get_documents(self, query_term): 
@@ -97,10 +122,6 @@ class ShelveIndeces(object):
 
 class SearchResults(object):
 	def __init__(self, docids_with_relevance):
-		# if docids_with_relevance:
-		#	self.docids, self.relevance = zip(*docids_with_relevance)
-		# else:
-		# 	self.docids, self.relevance = [], []
 		self.docids, self.relevance = zip(*docids_with_relevance) if docids_with_relevance else ([], [])
 
 	def get_page(self, page, page_size):
@@ -181,18 +202,23 @@ def create_index_from_dir(stored_documents_dir, index_dir,
 	total_docs = len(os.listdir(stored_documents_dir))
 	for filename in os.listdir(stored_documents_dir):
 		with open(os.path.join(stored_documents_dir, filename), 'r') as f:
-			doc_raw, doc_score = parse_reddit_post(f.read())
+			# doc_raw, doc_score = parse_reddit_post(f.read())
+			doc_raw = f.read().decode('utf-8')
+			doc_score = 0
 			parsed_doc = to_doc_terms(doc_raw)
 			indexer.add_document(base64.b16decode(filename), workaround.Document(parsed_doc, doc_score))
 			total_docs_indexed += 1
-			if total_docs_indexed % 100 == 0:
-				print 'Indexed: ', total_docs_indexed
+			logging.debug('Doc num: {}'.format(total_docs_indexed))
+			if total_docs_indexed % 50 == 0:
+				#print 'Indexed: ', total_docs_indexed
+				logging.debug('Sync...')
 				indexer.sync()
+				logging.debug('Sync!')
 	return indexer
 
 
 def main():
-	#logging.getLogger().setLevel(logging.INFO)
+	logging.getLogger().setLevel(logging.DEBUG)
 	parser = argparse.ArgumentParser(description='Index /r/astronomy/')
 	parser.add_argument('--stored_documents_dir',  dest='stored_documents_dir', required=True)
 	parser.add_argument('--index_dir', dest='index_dir', required=True)
