@@ -26,21 +26,7 @@ from collections import defaultdict
 from lang_proc import to_doc_terms
 import time
 import math
-
-
-class Document(object):
-	def __init__(self, parsed_text, score):
-		self.parsed_text = parsed_text
-		self.score = score
-
-	def __getitem__(self, i):
-		return self.parsed_text[i]
-
-	def __iter__(self):
-		return self.parsed_text.__iter__()
-
-	def __len__(self):
-		return len(self.parsed_text)
+import workaround
 
 
 class ShelveIndeces(object):
@@ -57,18 +43,23 @@ class ShelveIndeces(object):
 		self.url_to_id.close()
 
 	def load_from_disk(self, index_dir):
-		self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'))
-		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'))
-		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'))
+		self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'), writeback=True)
+		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'), writeback=True)
+		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'), writeback=True)
 		self.id_to_url = {v:k for k, v in self.url_to_id.iteritems()}
 		self.doc_count = 0
 
 	def start_indexing(self, index_dir):
 		# 'c' - for append
 		# 'n' - for rewrite
-		self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'), 'n')
-		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'), 'n')
-		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'), 'n')
+		self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'), 'n', writeback=True)
+		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'), 'n', writeback=True)
+		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'), 'n', writeback=True)
+
+	def sync(self):
+		self.inverted_index.sync()
+		self.forward_index.sync()
+		self.url_to_id.sync()
 
 	def add_document(self, url, document):
 		self.doc_count += 1
@@ -83,10 +74,13 @@ class ShelveIndeces(object):
 		self.forward_index[str(current_id)] = document
 
 		for pos, term in enumerate(document.parsed_text):
-			stem = term.stem.encode('utf-8')
-			posts = self.inverted_index.get(stem, []) 
-			posts.append((pos, current_id))
-			self.inverted_index[stem] = posts
+			stem = term.stem.encode('utf-8') 
+			if stem not in self.inverted_index:
+				self.inverted_index[stem] = []
+			# posts = self.inverted_index.get(stem, [])  # slow
+			# posts.append((pos, current_id))
+			# self.inverted_index[stem] = posts  # slow
+			self.inverted_index[stem].append((pos, current_id))
 
 	def get_documents(self, query_term): 
 		return self.inverted_index.get(query_term.stem.encode('utf-8'), [])
@@ -103,7 +97,11 @@ class ShelveIndeces(object):
 
 class SearchResults(object):
 	def __init__(self, docids_with_relevance):
-		self.docids, self.relevance = zip(*docids_with_relevance)
+		# if docids_with_relevance:
+		#	self.docids, self.relevance = zip(*docids_with_relevance)
+		# else:
+		# 	self.docids, self.relevance = [], []
+		self.docids, self.relevance = zip(*docids_with_relevance) if docids_with_relevance else ([], [])
 
 	def get_page(self, page, page_size):
 		offset = (page-1)*page_size
@@ -185,10 +183,11 @@ def create_index_from_dir(stored_documents_dir, index_dir,
 		with open(os.path.join(stored_documents_dir, filename), 'r') as f:
 			doc_raw, doc_score = parse_reddit_post(f.read())
 			parsed_doc = to_doc_terms(doc_raw)
-			indexer.add_document(base64.b16decode(filename), Document(parsed_doc, doc_score))
+			indexer.add_document(base64.b16decode(filename), workaround.Document(parsed_doc, doc_score))
 			total_docs_indexed += 1
 			if total_docs_indexed % 100 == 0:
 				print 'Indexed: ', total_docs_indexed
+				indexer.sync()
 	return indexer
 
 

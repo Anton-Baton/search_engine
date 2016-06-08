@@ -3,7 +3,9 @@ from flask_bootstrap import Bootstrap
 from flask_wtf import Form
 from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired
-from indexer import Searcher, ShelveIndeces, Document
+from indexer import Searcher, ShelveIndeces
+import workaround
+from workaround import Document
 from lang_proc import to_query_terms
 import time
 import cgi
@@ -34,6 +36,7 @@ def index():
 @app.route("/search_results/<query>", defaults={'page':1})
 @app.route("/search_results/<query>/<int:page>")
 def search_results(query, page):
+	start_processing_time = time.time()
 	query_terms = to_query_terms(query)
 	page_size = 25
 	offset = (page-1)*page_size
@@ -41,17 +44,16 @@ def search_results(query, page):
 	search_results = g.searcher.find_documents_OR(query_terms,
 		offset=(page-1)*page_size, limit=page_size)
 	docids = search_results.get_page(page, page_size)
-	search_time = time.time() - start_search_time
-	print 'Search time: ', search_time
+	print 'Search time: ', time.time() - start_search_time
 	urls = [g.searcher.get_url(doc_id) for doc_id in docids]
 	start_snippets_time = time.time()
 	texts = [g.searcher.generate_snippet(query_terms, doc_id) for doc_id in docids]
-	snippets_time = time.time() -start_snippets_time
-	print 'Snippets time: ', snippets_time
+	print 'Snippets time: ', time.time() -start_snippets_time
+	full_time = time.time() - start_processing_time
 	return render_template('search_results.html',
 		page=page, offset=offset+1, total_pages_num=search_results.total_pages(page_size),
 		query=cgi.escape(query), total_docs_num=search_results.total_docs(),
-		processing_time = search_time+snippets_time, urls_and_texts=zip(urls, texts))
+		processing_time = full_time, urls_and_texts=zip(urls, texts))
 
 if __name__ == '__main__':
 	app.run(debug=True)
