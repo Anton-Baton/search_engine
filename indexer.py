@@ -172,7 +172,6 @@ class Searcher(object):
 		terms_in_best_window = 0
 		document = self.indeces.get_document_text(doc_id)
 		start_time = time.time()
-		print query_terms
 		for pos, term in enumerate(document):
 			if term in query_terms:
 				query_terms_in_window.append((term, pos))
@@ -180,7 +179,7 @@ class Searcher(object):
 				if len(query_terms_in_window) > 1 and query_terms_in_window[0][0] == term:
 					query_terms_in_window.pop(0)
 				current_window_len = pos - query_terms_in_window[0][1] + 1
-				tiw = len(set(map(lambda x: x[0], query_terms_in_window)))
+				tiw = len(set(map(lambda x: x[0].stem, query_terms_in_window)))
 				if tiw > terms_in_best_window or (tiw == terms_in_best_window 
 					and current_window_len < best_window_len):
 					best_window = query_terms_in_window[:]

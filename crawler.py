@@ -8,18 +8,19 @@ import argparse
 from util import download_url, parse_reddit_post
 import re
 from collections import deque
-
+import time
 
 class Crawler(object):
-	def __init__(self, start_url, storage_dir):
+	def __init__(self, start_url, storage_dir, urls_to_crawl):
 		self.start_url = start_url
 		self.storage_dir = storage_dir
+		self.urls_to_crawl = urls_to_crawl
 
 	@staticmethod
 	def _make_absolute_url(url):
 		return 'http://reddit.com' + url
 
-	def crawl(self):
+	def crawl_reddit(self):
 		current_page_url = self.start_url
 		logging.getLogger('requests').setLevel(logging.WARNING)
 		logging.debug('Starting to crawl page {}'.format(self.start_url))
@@ -61,7 +62,9 @@ class Crawler(object):
 		def check_a_node(a):
 			if a and a.get('href', None):
 				url = a['href']
-				if url.startswith('/wiki') and not url.startswith('/wiki/Wikipedia:'):
+				ignore_urls_starts = ['/wiki/Wikipedia', '/wiki/Special', '/wiki/Categoty',
+					'/wiki/Book', '/wiki/Template', '/wiki/Talk', '/wiki/BookSources']
+				if url.startswith('/wiki') and not url.split(':')[0] in ignore_urls_starts:
 					return True
 			return False
 
@@ -69,8 +72,9 @@ class Crawler(object):
 			return 'https://en.wikipedia.org' + url
 
 		def prepare_url(url):
-			return make_absolute_wiki_url(re.split(r'(#)|(File:)', a['href'])[0])		
+			return make_absolute_wiki_url(re.split(r'#', a['href'])[0])		
 
+		start_time = time.time()
 		current_page_url = self.start_url
 		logging.getLogger('requests').setLevel(logging.WARNING)
 		logging.debug('Starting to crawl page {}'.format(self.start_url))
@@ -115,8 +119,9 @@ class Crawler(object):
 				error_url_count += 1
 			ok_url_count += 1
 			crawled_links.add(url)
-			if ok_url_count >= 3000:
+			if ok_url_count >= self.urls_to_crawl:
 				break
+		logging.debug('Total time: {}'.format(time.time() - start_time))
 			# time.sleep(2)
 
 			
@@ -129,7 +134,8 @@ def main():
 	parser.add_argument('--storage_dir', dest='storage_dir', required=True)
 	args = parser.parse_args()
 	#print args.start_url
-	crawler = Crawler(args.start_url, args.storage_dir)
+	urls_to_crawl = 3000
+	crawler = Crawler(args.start_url, args.storage_dir, urls_to_crawl)
 	crawler.crawl_wikipedia()
 	
 
