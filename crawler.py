@@ -122,9 +122,7 @@ class Crawler(object):
 			if ok_url_count >= self.urls_to_crawl:
 				break
 		logging.debug('Total time: {}'.format(time.time() - start_time))
-			# time.sleep(2)
-
-			
+			# time.sleep(2)			
 
 
 def main():
@@ -132,9 +130,10 @@ def main():
 	parser = argparse.ArgumentParser(description='Crawl /r/astronomy/')
 	parser.add_argument('--start_url',  dest='start_url', required=True)
 	parser.add_argument('--storage_dir', dest='storage_dir', required=True)
+	parser.add_argument('--urls_count', dest='urls_count', type=int)
 	args = parser.parse_args()
 	#print args.start_url
-	urls_to_crawl = 3000
+	urls_to_crawl = args.urls_count if hasattr(args, 'urls_count') else 3000
 	crawler = Crawler(args.start_url, args.storage_dir, urls_to_crawl)
 	crawler.crawl_wikipedia()
 	

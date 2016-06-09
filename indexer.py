@@ -252,8 +252,10 @@ def main():
 	parser.add_argument('--index_dir', dest='index_dir', required=True)
 	args = parser.parse_args()
 	#print args.start_url
+	indexing_start_time = time.time()
 	indexer = create_index_from_dir(args.stored_documents_dir, args.index_dir)
 	indexer.save_on_disk(args.index_dir)
+	logging.debug('Total time: {}'.format(time.time() - indexing_start_time))
 	
 	
 
