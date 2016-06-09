@@ -19,6 +19,12 @@ class Term(object):
 	def is_punctuation(self):
 		return self.stem in string.punctuation
 
+	def __str__(self):
+		return '{}({})'.format(self.stem, self.full_word)
+
+	def __repr__(self):
+		return str(self)
+
 
 def stem_and_tokenize_text(text):
 	sents = sent_tokenize(text)

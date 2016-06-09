@@ -72,7 +72,7 @@ class ShelveIndeces(object):
 		for block in blocks:
 			keys |= set(block.keys())
 		logging.debug('Total keys: {}'.format(len(keys)))
-		merged_index = shelve.open(os.path.join(self.index_dir, 'inverted_index'), 'n', writeback=True)
+		merged_index = shelve.open(os.path.join(self.index_dir, 'inverted_index'), 'n')
 		for key in keys:
 			merged_index[key] = sum([block.get(key, []) for block in blocks], [])
 		merged_index.close()
@@ -83,12 +83,12 @@ class ShelveIndeces(object):
 			self.inverted_index.close() 
 		self.inverted_index = shelve.open(
 				os.path.join(self.index_dir, 'inverted_index_block{}'.format(
-					self.block_count)),	'n', writeback=True)
+					self.block_count)), 'n', writeback=True)
 		logging.debug('Block created!')
 		self.block_count += 1
 		
 	def add_document(self, url, document):
-		if self.doc_count % 100 == 0:
+		if self.doc_count % 200 == 0:
 			self._create_new_ii_block()
 
 		self.doc_count += 1
@@ -106,8 +106,8 @@ class ShelveIndeces(object):
 			stem = term.stem.encode('utf-8') 
 			if stem not in self.inverted_index:
 				self.inverted_index[stem] = []
-			#self.inverted_index[stem].append(workaround.InvertedIndexHit(current_id, pos, document.score))
-			self.inverted_index[stem].append((pos, current_id))
+			self.inverted_index[stem].append(workaround.InvertedIndexHit(current_id, pos, document.score))
+			#self.inverted_index[stem].append((pos, current_id))
 
 	def get_documents(self, query_term): 
 		return self.inverted_index.get(query_term.stem.encode('utf-8'), [])
@@ -147,10 +147,10 @@ class Searcher(object):
 	def find_documents_OR(self, query_terms, offset=None, limit=None):
 		docids_and_relevances = set()
 		for query_term in query_terms:
-		 	for (pos, doc_id) in self.indeces.get_documents(query_term):
-		 		#docids_and_relevances.add((hit.doc_id, hit.score))
-		 		docids_and_relevances.add((doc_id, self.indeces.get_document_score(doc_id)))
- 		return SearchResults(sorted(list(docids_and_relevances), key=lambda x: x[1], reverde=True))
+		 	for hit in self.indeces.get_documents(query_term):
+		 		docids_and_relevances.add((hit.doc_id, hit.score))
+		 		#docids_and_relevances.add((doc_id, self.indeces.get_document_score(doc_id)))
+ 		return SearchResults(sorted(list(docids_and_relevances), key=lambda x: x[1], reverse=True))
 	"""
 	# AND-LIKE - if all words in doc
 	def find_documents_AND(self, query_terms, offset=None, limit=None):
@@ -171,6 +171,7 @@ class Searcher(object):
 		terms_in_best_window = 0
 		document = self.indeces.get_document_text(doc_id)
 		start_time = time.time()
+		print query_terms
 		for pos, term in enumerate(document):
 			if term in query_terms:
 				query_terms_in_window.append((term, pos))
@@ -190,13 +191,61 @@ class Searcher(object):
 		snippet_start = max(best_window[0][1] - snippet_padding, 0)
 		snippet_end = min(doc_len, best_window[-1][1] + 1 + snippet_padding)
 		snippet_len = snippet_end - snippet_start
-		if snippet_len > snippet_max_len:
-			delta = int(math.ceil(snippet_len - snippet_max_len)/2.)
-			left_border = snippet_start + snippet_len/2 - delta
-			right_border = snippet_end - snippet_len/2 + delta
-			#print('Document: {} \nDelta: {}'.format(self.indeces.id_to_url[doc_id], delta))
-			return [(term.full_word, term in query_terms) for term in document[snippet_start:left_border] + [Term('...')] + document[right_border:snippet_end]]
+		if snippet_len > snippet_max_len*10**8:
+			# -- First version -- #
 
+			#delta = int(math.ceil(snippet_len - snippet_max_len)/2.)
+			#left_border = snippet_start + snippet_len/2 - delta
+			#right_border = snippet_end - snippet_len/2 + delta
+			##print('Document: {} \nDelta: {}'.format(self.indeces.id_to_url[doc_id], delta))
+			#return [(term.full_word, term in query_terms) for term in document[snippet_start:left_border] + [Term('...')] + document[right_border:snippet_end]]
+			
+			# -- Second version -- #
+			
+			#snippet = []# [(term, term in query_terms) for term in document[snippet_start: best_window[0][1]]]
+			#cut_out_part = (snippet_len-snippet_max_len)*1./snippet_max_len
+			#for i in xrange(len(best_window)-1):
+			#	right_pos = best_window[i+1][1]
+			#	left_pos = best_window[i][1]
+			#	distance = right_pos - left_pos
+			#	cut_piece_len = int(distance * cut_out_part)
+			#	padding = (distance - cut_piece_len)/2
+			#	cut_out_piece_left = left_pos+1+padding
+			#	cut_out_piece_right = cut_out_piece_left + cut_piece_len
+			#
+			#	snippet.append(document[left_pos])
+			#	snippet.append(Term(' '.join(map(str, document[left_pos+1:cut_out_piece_left]+['...']+document[cut_out_piece_right:right_pos]))))
+			#left_border = best_window[0][1]
+			#right_border = best_window[-1][1]
+			#return [(term.full_word, term in query_terms) for term in document[snippet_start:left_border] + snippet + document[right_border:snippet_end]]
+
+			# -- Third version -- #
+			sub_windows = []
+			for i in xrange(len(best_window)-1):
+				left, right = best_window[i], best_window[i+1]
+				sub_windows.append((left[1], right[1], right[1] - left[1]))
+			# sort in descending order by window width
+			sub_windows_sorted = sorted(sub_windows, key=lambda x: x[2], reverse=True)
+			delta = snippet_len - snippet_max_len
+			pointer = 0
+			#snippet = []
+			zip_coordinates = set()
+			ellipsis_term = Term('...')
+			while delta > 0:
+				w_start, w_end, w_len = sub_windows_sorted[pointer]
+				delta -= w_len
+				zip_coordinates.add(w_start)
+				pointer += 1
+			snippet = [term for term in document[snippet_start: best_window[0][1]]]
+			for l, r, d in sub_windows:
+				snippet.append(document[l])
+				if l in zip_coordinates:
+					snippet.append(ellipsis_term)
+				else:
+					snippet.append(Term(' '.join(map(lambda x: x.full_word, document[l:r]))))
+			snippet.extend([term for term in document[best_window[-1][1]:snippet_end]])
+			return [(term.full_word, term in query_terms) for term in snippet]
+		print self.indeces.id_to_url[doc_id], ' {} - {} '.format(snippet_start, snippet_end), best_window
 		return [(term.full_word, term in query_terms) for term in document[snippet_start: snippet_end]]
 
 	def get_url(self, doc_id):
@@ -209,17 +258,18 @@ def create_index_from_dir(stored_documents_dir, index_dir,
 	indexer = IndecesImplementation()
 	indexer.start_indexing(index_dir)
 	total_docs_indexed = 0
-	total_docs = len(os.listdir(stored_documents_dir))
+	#total_docs = len(os.listdir(stored_documents_dir))
 	for filename in os.listdir(stored_documents_dir):
 		with open(os.path.join(stored_documents_dir, filename), 'r') as f:
-			# doc_raw, doc_score = parse_reddit_post(f.read())
+			# TODO: Swith, cause reddit and wiki parsed with differences
+			#doc_raw, doc_score = parse_reddit_post(f.read())
 			doc_raw = f.read().decode('utf-8')
 			doc_score = 0
 			parsed_doc = to_doc_terms(doc_raw)
 			indexer.add_document(base64.b16decode(filename), workaround.Document(parsed_doc, doc_score))
 			total_docs_indexed += 1
 			logging.debug('Doc num: {}'.format(total_docs_indexed))
-			if total_docs_indexed % 50 == 0:
+			if total_docs_indexed % 100 == 0:
 				#print 'Indexed: ', total_docs_indexed
 				logging.debug('Sync...')
 				indexer.sync()
