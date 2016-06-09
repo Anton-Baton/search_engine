@@ -163,6 +163,7 @@ class Searcher(object):
 	"""
 
 	def generate_snippet(self, query_terms, doc_id):
+		# TODO: move constants to config
 		snippet_max_len = 50
 		snippet_padding = 15
 		query_terms_in_window = []
@@ -185,41 +186,11 @@ class Searcher(object):
 					best_window = query_terms_in_window[:]
 					best_window_len = current_window_len
 					terms_in_best_window = tiw
-		#print 'Snippet time: ', time.time() - start_time
 		doc_len = len(document)
-		# TODO: move 15 to named constants
 		snippet_start = max(best_window[0][1] - snippet_padding, 0)
 		snippet_end = min(doc_len, best_window[-1][1] + 1 + snippet_padding)
 		snippet_len = snippet_end - snippet_start
-		if snippet_len > snippet_max_len*10**8:
-			# -- First version -- #
-
-			#delta = int(math.ceil(snippet_len - snippet_max_len)/2.)
-			#left_border = snippet_start + snippet_len/2 - delta
-			#right_border = snippet_end - snippet_len/2 + delta
-			##print('Document: {} \nDelta: {}'.format(self.indeces.id_to_url[doc_id], delta))
-			#return [(term.full_word, term in query_terms) for term in document[snippet_start:left_border] + [Term('...')] + document[right_border:snippet_end]]
-			
-			# -- Second version -- #
-			
-			#snippet = []# [(term, term in query_terms) for term in document[snippet_start: best_window[0][1]]]
-			#cut_out_part = (snippet_len-snippet_max_len)*1./snippet_max_len
-			#for i in xrange(len(best_window)-1):
-			#	right_pos = best_window[i+1][1]
-			#	left_pos = best_window[i][1]
-			#	distance = right_pos - left_pos
-			#	cut_piece_len = int(distance * cut_out_part)
-			#	padding = (distance - cut_piece_len)/2
-			#	cut_out_piece_left = left_pos+1+padding
-			#	cut_out_piece_right = cut_out_piece_left + cut_piece_len
-			#
-			#	snippet.append(document[left_pos])
-			#	snippet.append(Term(' '.join(map(str, document[left_pos+1:cut_out_piece_left]+['...']+document[cut_out_piece_right:right_pos]))))
-			#left_border = best_window[0][1]
-			#right_border = best_window[-1][1]
-			#return [(term.full_word, term in query_terms) for term in document[snippet_start:left_border] + snippet + document[right_border:snippet_end]]
-
-			# -- Third version -- #
+		if snippet_len > snippet_max_len:
 			sub_windows = []
 			for i in xrange(len(best_window)-1):
 				left, right = best_window[i], best_window[i+1]
@@ -228,7 +199,6 @@ class Searcher(object):
 			sub_windows_sorted = sorted(sub_windows, key=lambda x: x[2], reverse=True)
 			delta = snippet_len - snippet_max_len
 			pointer = 0
-			#snippet = []
 			zip_coordinates = set()
 			ellipsis_term = Term('...')
 			while delta > 0:
@@ -245,7 +215,6 @@ class Searcher(object):
 					snippet.append(Term(' '.join(map(lambda x: x.full_word, document[l:r]))))
 			snippet.extend([term for term in document[best_window[-1][1]:snippet_end]])
 			return [(term.full_word, term in query_terms) for term in snippet]
-		print self.indeces.id_to_url[doc_id], ' {} - {} '.format(snippet_start, snippet_end), best_window
 		return [(term.full_word, term in query_terms) for term in document[snippet_start: snippet_end]]
 
 	def get_url(self, doc_id):
