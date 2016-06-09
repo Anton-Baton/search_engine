@@ -254,7 +254,10 @@ def main():
 	#print args.start_url
 	indexing_start_time = time.time()
 	indexer = create_index_from_dir(args.stored_documents_dir, args.index_dir)
+	merging_start_time = time.time()
 	indexer.save_on_disk(args.index_dir)
+	logging.debug('Indexing time: {}'.format(merging_start_time - indexing_start_time))
+	logging.debug('Merging time: {}'.format(time.time() - merging_start_time))
 	logging.debug('Total time: {}'.format(time.time() - indexing_start_time))
 	
 	
