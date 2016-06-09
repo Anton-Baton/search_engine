@@ -13,12 +13,15 @@ import cgi
 app = Flask(__name__)
 Bootstrap(app)
 # TODO: configurable
-# searcher = Searcher('shelve_indeces', ShelveIndeces)
+searcher = Searcher('shelve_indeces', ShelveIndeces)
 
 
-@app.before_request
-def init_searcher():
-	g.searcher = Searcher('wiki_indices', ShelveIndeces)
+#@app.before_request
+#def init_searcher():
+#	start_time = time.time()
+#	# TODO: move folder to config
+#	g.searcher = Searcher('shelve_indeces', ShelveIndeces)
+#	print 'Searcher time: ', time.time() - start_time
 
 class SearchForm(Form):
 	user_query = StringField('user_query', validators=[DataRequired()])
@@ -41,13 +44,13 @@ def search_results(query, page):
 	page_size = 25
 	offset = (page-1)*page_size
 	start_search_time = time.time()
-	search_results = g.searcher.find_documents_OR(query_terms,
+	search_results = searcher.find_documents_OR(query_terms,
 		offset=(page-1)*page_size, limit=page_size)
 	docids = search_results.get_page(page, page_size)
 	print 'Search time: ', time.time() - start_search_time
-	urls = [g.searcher.get_url(doc_id) for doc_id in docids]
+	urls = [searcher.get_url(doc_id) for doc_id in docids]
 	start_snippets_time = time.time()
-	texts = [g.searcher.generate_snippet(query_terms, doc_id) for doc_id in docids]
+	texts = [searcher.generate_snippet(query_terms, doc_id) for doc_id in docids]
 	print 'Snippets time: ', time.time() -start_snippets_time
 	full_time = time.time() - start_processing_time
 	return render_template('search_results.html',

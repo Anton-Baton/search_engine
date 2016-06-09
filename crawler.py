@@ -61,7 +61,7 @@ class Crawler(object):
 		def check_a_node(a):
 			if a and a.get('href', None):
 				url = a['href']
-				if url.startswith('/wiki'):
+				if url.startswith('/wiki') and not url.startswith('/wiki/Wikipedia:'):
 					return True
 			return False
 
@@ -78,8 +78,9 @@ class Crawler(object):
 		#headers = {'User-Agent': 'SearchingBot 0.1'}	
 		ok_url_count = 0
 		error_url_count = 0
+		url_number = 0
 		links_to_crawl = deque()
-		links_to_crawl.apped(current_page_url)
+		links_to_crawl.append(current_page_url)
 		crawled_links = set()
 		while True:	
 			url = links_to_crawl.popleft()
@@ -90,12 +91,12 @@ class Crawler(object):
 				logging.info("Crawled {} oks - {} errors".format(ok_url_count, error_url_count))
 			try:
 				current_page = download_url(url)
-				logging.debug('200: {}'.format(url))
+				logging.debug('{}. 200: {}'.format(url_number, url))
 			except Exception as e:
 				status_code = e.message
-				logging.warning('{}: {}'.format(status_code, url))
+				logging.warning('{}. {}: {}'.format(url_number, status_code, url))
 				continue
-			
+			url_number += 1
 
 			soup = BeautifulSoup(current_page, 'html.parser')
 			for tag in soup(['style', 'script']):

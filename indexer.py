@@ -23,7 +23,7 @@ import base64
 import argparse
 from util import parse_reddit_post
 from collections import defaultdict
-from lang_proc import to_doc_terms
+from lang_proc import to_doc_terms, Term
 import time
 import math
 import workaround
@@ -68,13 +68,14 @@ class ShelveIndeces(object):
 	def _merge_blocks(self):
 		logging.debug('Start merging blocks')
 		blocks = [shelve.open(os.path.join(self.index_dir, 'inverted_index_block{}'.format(i))) for i in xrange(self.block_count+1)]
-		keys = set(sum([block.keys() for block in blocks], []))
+		keys = set()  #sum([set(block.keys()) for block in blocks], set)
+		for block in blocks:
+			keys |= set(block.keys())
 		logging.debug('Total keys: {}'.format(len(keys)))
 		merged_index = shelve.open(os.path.join(self.index_dir, 'inverted_index'), 'n', writeback=True)
 		for key in keys:
 			merged_index[key] = sum([block.get(key, []) for block in blocks], [])
 		merged_index.close()
-		#self.inverted_index = merged_index
 
 	def _create_new_ii_block(self):
 		logging.debug('New ii block: {}'.format(self.block_count))
@@ -162,7 +163,9 @@ class Searcher(object):
 		return SearchResults(self.rank_docids([doc_id for doc_id, unique_hits in query_terms_count.iteritems() 
 				if len(unique_hits) == len(query_terms)]))
 
-	def generate_snippet(self, query_terms, doc_id): 
+	def generate_snippet(self, query_terms, doc_id):
+		snippet_max_len = 50
+		snippet_padding = 15
 		query_terms_in_window = []
 		best_window_len = 10**8
 		best_window = []
@@ -185,8 +188,16 @@ class Searcher(object):
 		#print 'Snippet time: ', time.time() - start_time
 		doc_len = len(document)
 		# TODO: move 15 to named constants
-		snippet_start = max(best_window[0][1] - 15, 0)
-		snippet_end = min(doc_len, best_window[-1][1] + 1 +15)
+		snippet_start = max(best_window[0][1] - snippet_padding, 0)
+		snippet_end = min(doc_len, best_window[-1][1] + 1 + snippet_padding)
+		snippet_len = snippet_end - snippet_start
+		if snippet_len > snippet_max_len:
+			delta = int(math.ceil(snippet_len - snippet_max_len)/2.)
+			left_border = snippet_start + snippet_len/2 - delta
+			right_border = snippet_end - snippet_len/2 + delta
+			#print('Document: {} \nDelta: {}'.format(self.indeces.id_to_url[doc_id], delta))
+			return [(term.full_word, term in query_terms) for term in document[snippet_start:left_border] + [Term('...')] + document[right_border:snippet_end]]
+
 		return [(term.full_word, term in query_terms) for term in document[snippet_start: snippet_end]]
 
 	def get_url(self, doc_id):
