@@ -9,11 +9,12 @@ from workaround import Document
 from lang_proc import to_query_terms
 import time
 import cgi
+import os
 
 app = Flask(__name__)
 Bootstrap(app)
 # TODO: configurable
-searcher = Searcher('shelve_indeces', ShelveIndeces)
+searcher = Searcher(os.environ['INDEX_DIR'], ShelveIndeces)
 
 
 #@app.before_request

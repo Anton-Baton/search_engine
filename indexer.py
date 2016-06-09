@@ -72,7 +72,7 @@ class ShelveIndeces(object):
 		for block in blocks:
 			keys |= set(block.keys())
 		logging.debug('Total keys: {}'.format(len(keys)))
-		merged_index = shelve.open(os.path.join(self.index_dir, 'inverted_index'), 'n')
+		merged_index = shelve.open(os.path.join(self.index_dir, 'inverted_index'), 'n', writeback=True)
 		for key in keys:
 			merged_index[key] = sum([block.get(key, []) for block in blocks], [])
 		merged_index.close()
@@ -106,6 +106,7 @@ class ShelveIndeces(object):
 			stem = term.stem.encode('utf-8') 
 			if stem not in self.inverted_index:
 				self.inverted_index[stem] = []
+			#self.inverted_index[stem].append(workaround.InvertedIndexHit(current_id, pos, document.score))
 			self.inverted_index[stem].append((pos, current_id))
 
 	def get_documents(self, query_term): 
@@ -114,11 +115,11 @@ class ShelveIndeces(object):
 	def get_document_text(self, doc_id):
 		return self.forward_index[str(doc_id)].parsed_text
 
-	def get_url(self, doc_id):
-		return self.id_to_url[doc_id]
-
 	def get_document_score(self, doc_id):
 		return self.forward_index[str(doc_id)].score
+
+	def get_url(self, doc_id):
+		return self.id_to_url[doc_id]
 
 
 class SearchResults(object):
@@ -144,16 +145,13 @@ class Searcher(object):
 	# query [word1, word2] -> all documents that contains one of this words
 	# OR-LIKE
 	def find_documents_OR(self, query_terms, offset=None, limit=None):
-		docids = set()
+		docids_and_relevances = set()
 		for query_term in query_terms:
 		 	for (pos, doc_id) in self.indeces.get_documents(query_term):
-		 		docids.add(doc_id)
-		return SearchResults(self.rank_docids(docids))
-	
-	def rank_docids(self, docids):
-		return sorted([(doc_id, self.indeces.get_document_score(doc_id)) for doc_id in docids],
-			key=lambda x: x[1], reverse=True)
-
+		 		#docids_and_relevances.add((hit.doc_id, hit.score))
+		 		docids_and_relevances.add((doc_id, self.indeces.get_document_score(doc_id)))
+ 		return SearchResults(sorted(list(docids_and_relevances), key=lambda x: x[1], reverde=True))
+	"""
 	# AND-LIKE - if all words in doc
 	def find_documents_AND(self, query_terms, offset=None, limit=None):
 		query_terms_count = defaultdict(set)
@@ -162,6 +160,7 @@ class Searcher(object):
 				query_terms_count[doc_id].add(query_term)
 		return SearchResults(self.rank_docids([doc_id for doc_id, unique_hits in query_terms_count.iteritems() 
 				if len(unique_hits) == len(query_terms)]))
+	"""
 
 	def generate_snippet(self, query_terms, doc_id):
 		snippet_max_len = 50

@@ -12,3 +12,10 @@ class Document(object):
 
 	def __len__(self):
 		return len(self.parsed_text)
+
+
+class InvertedIndexHit(object):
+	def __init__(self, doc_id, position, score):
+		self.doc_id = doc_id
+		self.position = position
+		self.score = score
