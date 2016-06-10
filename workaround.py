@@ -23,3 +23,6 @@ class InvertedIndexHit(object):
 	# TODO: find better way to get unique Hits in document
 	def __eq__(self, other):
 		return self.doc_id == other.doc_id
+
+	def __hash__(self):
+		return hash('{}'.format(self.doc_id))

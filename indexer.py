@@ -36,10 +36,11 @@ class ShelveIndeces(object):
 		self.forward_index = None
 		self.url_to_id = None
 		self.id_to_url = dict()
+		self.index_metadata = None
 		self._doc_count = 0
 		self.block_count = 0
-		# TODO: avg and total documents count
-		
+		self._avg_doc_len = 0
+		self._total_words_count = 0		
 
 	def total_doc_count(self):
 		return self._doc_count
@@ -52,22 +53,31 @@ class ShelveIndeces(object):
 		self.forward_index.close()
 		self.url_to_id.close()
 		self._merge_blocks()
+		self.index_metadata['total_words_count'] = self._total_words_count
+		self.index_metadata['documents_count'] = self._doc_count
+		self.index_metadata.close()
 
 	def load_from_disk(self, index_dir):
 		self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'), writeback=True)
 		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'), writeback=True)
 		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'), writeback=True)
+		self.index_metadata = shelve.open(os.path.join(index_dir, 'index_metadata'), writeback=True)
 		self.id_to_url = {v:k for k, v in self.url_to_id.iteritems()}
+
+		self._doc_count = self.index_metadata['documents_count']
+		self._total_words_count = self.index_metadata['total_words_count'] 
+		self._avg_doc_len = self._total_words_count / self._doc_count
+
 		# logging.debug('1/2 loaded')
-		print 'Loading...'
-		self._doc_count = 0
-		total_word_count = 0
-		for (doc_id, text) in self.forward_index.iteritems():
-			self._doc_count += 1
-			total_word_count += len(text)
-		self._avg_doc_len = total_word_count / self._doc_count
+		#print 'Loading...'
+		#self._doc_count = 0
+		#total_word_count = 0
+		#for (doc_id, text) in self.forward_index.iteritems():
+		#	self._doc_count += 1
+		#	total_word_count += len(text)
+		#self._avg_doc_len = total_word_count / self._doc_count
 		#logging.debug('Loaded from disk')
-		print 'Loaded!'
+		#print 'Loaded!'
 
 	def start_indexing(self, index_dir):
 		# 'c' - for append
@@ -75,12 +85,14 @@ class ShelveIndeces(object):
 		# self.inverted_index = shelve.open(os.path.join(index_dir, 'inverted_index'), 'n', writeback=True)
 		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'), 'n', writeback=True)
 		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'), 'n', writeback=True)
+		self.index_metadata = shelve.open(os.path.join(index_dir, 'index_metadata'), 'n', writeback=True)
 		self.index_dir = index_dir
 
 	def sync(self):
 		self.inverted_index.sync()
 		self.forward_index.sync()
 		self.url_to_id.sync()
+		self.index_metadata.sync()
 
 	def _merge_blocks(self):
 		logging.debug('Start merging blocks')
@@ -121,6 +133,7 @@ class ShelveIndeces(object):
 		self.url_to_id[url] = current_id
 		self.id_to_url[str(current_id)] = url
 		self.forward_index[str(current_id)] = document
+		self._total_words_count += len(document.parsed_text)
 
 		for pos, term in enumerate(document.parsed_text):
 			stem = term.stem.encode('utf-8') 
@@ -178,12 +191,10 @@ class Searcher(object):
  		text_len = len(text)
  		for query_term, nd_containing in query_terms_to_posting_lists_sizes.iteritems():
  			term_frequency = float(len([term for term in text if term == query_term]))/text_len
- 			# TODO: find N
- 			print self.indeces.total_doc_count(), nd_containing
  			inverted_document_freq = math.log((self.indeces.total_doc_count() - nd_containing + 0.5)/(nd_containing + 0.5))
  			k1 = 1.5
  			b = 0.75
- 			result += inverted_document_freq*term_frequency*(k1+1) / (term_frequency+k1*(1-b+b*query_terms_to_posting_lists_sizes[query_term]/self.indeces.average_doc_len()))
+ 			result += inverted_document_freq*term_frequency*(k1+1) / (term_frequency+k1*(1-b+b*text_len/self.indeces.average_doc_len()))
  		return result
 
  	def find_documents_and_rank_by_bm25(self, query_terms):
@@ -191,8 +202,6 @@ class Searcher(object):
  		query_terms_to_posting_lists_sizes = dict()
  		for query_term in query_terms:
  			posting_list = set(self.indeces.get_documents(query_term))
- 			print posting_list
- 			# hits_num = len(docs)
  			query_terms_to_posting_lists_sizes[query_term] = len(posting_list)
  			for hit in posting_list:
  				docids.add(hit.doc_id)
