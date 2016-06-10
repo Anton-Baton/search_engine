@@ -13,7 +13,7 @@ import os
 
 app = Flask(__name__)
 Bootstrap(app)
-INDEX_DIR = 'wiki_large_indices'
+INDEX_DIR = 'wiki_10k_indices'
 # TODO: configurable
 #searcher = Searcher(os.environ['INDEX_DIR'], ShelveIndeces)
 searcher = Searcher(INDEX_DIR, ShelveIndeces)

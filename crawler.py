@@ -62,8 +62,9 @@ class Crawler(object):
 		def check_a_node(a):
 			if a and a.get('href', None):
 				url = a['href']
-				ignore_urls_starts = ['/wiki/Wikipedia', '/wiki/Special', '/wiki/Categoty',
-					'/wiki/Book', '/wiki/Template', '/wiki/Talk', '/wiki/BookSources']
+				ignore_urls_starts = ['/wiki/Wikipedia', '/wiki/Special', '/wiki/Category',
+					'/wiki/Template_talk'
+					'/wiki/Book', '/wiki/Template', '/wiki/Talk', '/wiki/BookSources', '/wiki/File']
 				if url.startswith('/wiki') and not url.split(':')[0] in ignore_urls_starts:
 					return True
 			return False

@@ -71,9 +71,12 @@ class ShelveIndeces(object):
 		keys = set()  #sum([set(block.keys()) for block in blocks], set)
 		for block in blocks:
 			keys |= set(block.keys())
-		logging.debug('Total keys: {}'.format(len(keys)))
+		all_keys_len = len(keys)
+		logging.debug('Total keys: {}'.format(all_keys_len))
 		merged_index = shelve.open(os.path.join(self.index_dir, 'inverted_index'), 'n')
-		for key in keys:
+		for i, key in enumerate(keys):
+			if i % 10000 == 0:
+				logging.debug('Merged {} keys'.format(i))
 			merged_index[key] = sum([block.get(key, []) for block in blocks], [])
 		merged_index.close()
 
