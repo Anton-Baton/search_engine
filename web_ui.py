@@ -13,7 +13,7 @@ import os
 
 app = Flask(__name__)
 Bootstrap(app)
-INDEX_DIR = 'wiki_10k_indices'
+INDEX_DIR = 'wiki_indices'
 # TODO: configurable
 #searcher = Searcher(os.environ['INDEX_DIR'], ShelveIndeces)
 searcher = Searcher(INDEX_DIR, ShelveIndeces)
@@ -47,8 +47,7 @@ def search_results(query, page):
 	page_size = 25
 	offset = (page-1)*page_size
 	start_search_time = time.time()
-	search_results = searcher.find_documents_OR(query_terms,
-		offset=(page-1)*page_size, limit=page_size)
+	search_results = searcher.find_documents_and_rank_by_bm25(query_terms)
 	docids = search_results.get_page(page, page_size)
 	print 'Search time: ', time.time() - start_search_time
 	urls = [searcher.get_url(doc_id) for doc_id in docids]

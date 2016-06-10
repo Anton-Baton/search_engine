@@ -19,3 +19,7 @@ class InvertedIndexHit(object):
 		self.doc_id = doc_id
 		self.position = position
 		self.score = score
+
+	# TODO: find better way to get unique Hits in document
+	def __eq__(self, other):
+		return self.doc_id == other.doc_id

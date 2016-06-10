@@ -36,8 +36,16 @@ class ShelveIndeces(object):
 		self.forward_index = None
 		self.url_to_id = None
 		self.id_to_url = dict()
-		self.doc_count = 0
+		self._doc_count = 0
 		self.block_count = 0
+		# TODO: avg and total documents count
+		
+
+	def total_doc_count(self):
+		return self._doc_count
+
+	def average_doc_len(self):
+		return self._avg_doc_len
 
 	def save_on_disk(self, index_dir):
 		self.inverted_index.close()
@@ -50,7 +58,16 @@ class ShelveIndeces(object):
 		self.forward_index = shelve.open(os.path.join(index_dir, 'forward_index'), writeback=True)
 		self.url_to_id = shelve.open(os.path.join(index_dir, 'url_to_id'), writeback=True)
 		self.id_to_url = {v:k for k, v in self.url_to_id.iteritems()}
-		self.doc_count = 0
+		# logging.debug('1/2 loaded')
+		print 'Loading...'
+		self._doc_count = 0
+		total_word_count = 0
+		for (doc_id, text) in self.forward_index.iteritems():
+			self._doc_count += 1
+			total_word_count += len(text)
+		self._avg_doc_len = total_word_count / self._doc_count
+		#logging.debug('Loaded from disk')
+		print 'Loaded!'
 
 	def start_indexing(self, index_dir):
 		# 'c' - for append
@@ -71,7 +88,7 @@ class ShelveIndeces(object):
 		keys = set()  #sum([set(block.keys()) for block in blocks], set)
 		for block in blocks:
 			keys |= set(block.keys())
-		all_keys_len = len(keys)
+		all_keys_len  = len(keys)
 		logging.debug('Total keys: {}'.format(all_keys_len))
 		merged_index = shelve.open(os.path.join(self.index_dir, 'inverted_index'), 'n')
 		for i, key in enumerate(keys):
@@ -91,16 +108,16 @@ class ShelveIndeces(object):
 		self.block_count += 1
 		
 	def add_document(self, url, document):
-		if self.doc_count % 200 == 0:
+		if self._doc_count % 200 == 0:
 			self._create_new_ii_block()
 
-		self.doc_count += 1
+		self._doc_count += 1
 
 		if url in self.url_to_id:
 			logging.debug('URL already indexed: {}'.format(url))
 			return
 
-		current_id = self.doc_count
+		current_id = self._doc_count
 		self.url_to_id[url] = current_id
 		self.id_to_url[str(current_id)] = url
 		self.forward_index[str(current_id)] = document
@@ -147,13 +164,48 @@ class Searcher(object):
 
 	# query [word1, word2] -> all documents that contains one of this words
 	# OR-LIKE
-	def find_documents_OR(self, query_terms, offset=None, limit=None):
+	def find_documents_and_rank_by_points(self, query_terms):
 		docids_and_relevances = set()
 		for query_term in query_terms:
 		 	for hit in self.indeces.get_documents(query_term):
 		 		docids_and_relevances.add((hit.doc_id, hit.score))
 		 		#docids_and_relevances.add((doc_id, self.indeces.get_document_score(doc_id)))
  		return SearchResults(sorted(list(docids_and_relevances), key=lambda x: x[1], reverse=True))
+
+ 	def _bm25(self, doc_id, query_terms_to_posting_lists_sizes):
+ 		result = 0
+ 		text = self.indeces.get_document_text(doc_id)
+ 		text_len = len(text)
+ 		for query_term, nd_containing in query_terms_to_posting_lists_sizes.iteritems():
+ 			term_frequency = float(len([term for term in text if term == query_term]))/text_len
+ 			# TODO: find N
+ 			print self.indeces.total_doc_count(), nd_containing
+ 			inverted_document_freq = math.log((self.indeces.total_doc_count() - nd_containing + 0.5)/(nd_containing + 0.5))
+ 			k1 = 1.5
+ 			b = 0.75
+ 			result += inverted_document_freq*term_frequency*(k1+1) / (term_frequency+k1*(1-b+b*query_terms_to_posting_lists_sizes[query_term]/self.indeces.average_doc_len()))
+ 		return result
+
+ 	def find_documents_and_rank_by_bm25(self, query_terms):
+ 		docids = set()
+ 		query_terms_to_posting_lists_sizes = dict()
+ 		for query_term in query_terms:
+ 			posting_list = set(self.indeces.get_documents(query_term))
+ 			print posting_list
+ 			# hits_num = len(docs)
+ 			query_terms_to_posting_lists_sizes[query_term] = len(posting_list)
+ 			for hit in posting_list:
+ 				docids.add(hit.doc_id)
+
+ 		docids_and_relevances = set()
+ 		for doc_id in docids:
+ 			docids_and_relevances.add((doc_id, self._bm25(doc_id, query_terms_to_posting_lists_sizes)))
+ 		
+ 		return SearchResults(sorted(list(docids_and_relevances), key=lambda x: x[1], reverse=True))
+
+
+
+
 	"""
 	# AND-LIKE - if all words in doc
 	def find_documents_AND(self, query_terms, offset=None, limit=None):
