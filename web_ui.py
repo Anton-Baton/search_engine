@@ -10,10 +10,11 @@ from lang_proc import to_query_terms
 import time
 import cgi
 import os
+import logging
 
 app = Flask(__name__)
 Bootstrap(app)
-INDEX_DIR = 'wiki_indices'
+INDEX_DIR = 'wiki_10k_indices'
 # TODO: configurable
 #searcher = Searcher(os.environ['INDEX_DIR'], ShelveIndeces)
 searcher = Searcher(INDEX_DIR, ShelveIndeces)
@@ -49,11 +50,11 @@ def search_results(query, page):
 	start_search_time = time.time()
 	search_results = searcher.find_documents_and_rank_by_bm25(query_terms)
 	docids = search_results.get_page(page, page_size)
-	print 'Search time: ', time.time() - start_search_time
+	logging.debug('Search time: {}'.format(time.time() - start_search_time))
 	urls = [searcher.get_url(doc_id) for doc_id in docids]
 	start_snippets_time = time.time()
 	texts = [searcher.generate_snippet(query_terms, doc_id) for doc_id in docids]
-	print 'Snippets time: ', time.time() -start_snippets_time
+	logging.debug('Snippets time: {}'.format(time.time() -start_snippets_time))
 	full_time = time.time() - start_processing_time
 	return render_template('search_results.html',
 		page=page, offset=offset+1, total_pages_num=search_results.total_pages(page_size),
@@ -61,4 +62,5 @@ def search_results(query, page):
 		processing_time = full_time, urls_and_texts=zip(urls, texts))
 
 if __name__ == '__main__':
+	logging.getLogger().setLevel(logging.DEBUG)
 	app.run(debug=True)
