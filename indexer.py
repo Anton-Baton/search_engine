@@ -200,7 +200,13 @@ class Searcher(object):
 
 	def generate_snippet(self, query_terms, doc_id):
 		# TODO: move constants to config
-		snippet_max_len = 50
+
+		# TODO: create function that cuts the url to the appropriate length
+		#def transform_if_link(term):
+		#	if term.full_word.startswith('http'):
+		#		return Term(term.full_word[:])
+		
+		snippet_max_len = 40
 		snippet_padding = 15
 		query_terms_in_window = []
 		best_window_len = 10**8

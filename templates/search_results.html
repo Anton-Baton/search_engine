@@ -33,13 +33,13 @@
 		<nav>
 			<ul class="pagination">
 				<li>
-					<a href="#" aria-label="Previous"><span aria-hidden="true">&loquo;</span></a>
+					<a href="#" aria-label="Previous"><span aria-hidden="true">&#8592;</span></a>
 				</li>
 				{% for page_num in range(total_pages_num) %}
 				<li {% if loop.index == page %} class=active {% endif %}><a href="{{url_for('search_results', query=query, page=loop.index)}}" >{{loop.index}}</a></li>
 				{% endfor %}
 				<li>
-					<a href="#" aria-label="Next"><span aria-hidden="true">&roquo;</span></a>
+					<a href="#" aria-label="Next"><span aria-hidden="true">&#8594;</span></a>
 				</li>
 		</nav>
 	</div>
